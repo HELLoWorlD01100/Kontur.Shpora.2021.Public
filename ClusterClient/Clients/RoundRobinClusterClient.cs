@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using log4net;
 
@@ -13,11 +11,40 @@ namespace ClusterClient.Clients
         {
         }
 
-        public override Task<string> ProcessRequestAsync(string query, TimeSpan timeout)
+        protected override ILog Log => LogManager.GetLogger(typeof(RoundRobinClusterClient));
+
+        public override async Task<string> ProcessRequestAsync(string query, TimeSpan timeout)
         {
-            throw new NotImplementedException();
+            var sw = new Stopwatch();
+            var delta = ReplicaAddresses.Length;
+            foreach (var uri in ReplicaAddresses)
+            {
+                var webRequest = CreateRequest(uri + "?query=" + query);
+
+                Log.InfoFormat($"Processing {webRequest.RequestUri}");
+                
+                var resultTask = ProcessRequestAsync(webRequest);
+                
+                sw.Start();
+                
+                await Task.WhenAny(resultTask, Task.Delay(timeout.Divide(delta)));
+                
+                sw.Stop();
+                timeout -= sw.Elapsed;
+                sw.Reset();
+                
+                delta--;
+                
+                if (resultTask.IsCompletedSuccessfully)
+                    return resultTask.Result;
+            }
+
+            throw new TimeoutException();
         }
 
-        protected override ILog Log => LogManager.GetLogger(typeof(RoundRobinClusterClient));
+        private TimeSpan GetSoftTimeout(TimeSpan timeSpan)
+        {
+            return timeSpan.Divide(ReplicaAddresses.Length);
+        }
     }
 }

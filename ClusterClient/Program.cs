@@ -12,11 +12,11 @@ using log4net.Config;
 
 namespace ClusterClient
 {
-    class Program
+    public class Program
     {
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
-            Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             XmlConfigurator.Configure(LogManager.GetRepository(Assembly.GetCallingAssembly()), new FileInfo("log4net.config"));
 
             if (!TryGetReplicaAddresses(args, out var replicaAddresses))
